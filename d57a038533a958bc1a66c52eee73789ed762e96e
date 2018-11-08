@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "9abe1de1_691b5a1c",
+        "filename": "python-ironic-tests-tempest.spec",
+        "patchSetId": 1
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 128
+      },
+      "writtenOn": "2018-11-08T09:59:12Z",
+      "side": 1,
+      "message": "We don\u0027t need the Obsoletes in the python packages without binaries. In those cases, upgrades should be managed in a different way, not pure yum update.",
+      "range": {
+        "startLine": 44,
+        "startChar": 0,
+        "endLine": 46,
+        "endChar": 6
+      },
+      "revId": "d57a038533a958bc1a66c52eee73789ed762e96e",
+      "serverId": "270e2033-b340-4cff-9539-693957ebf0e7",
+      "unresolved": false
+    }
+  ]
+}
