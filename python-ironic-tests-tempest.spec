@@ -66,7 +66,7 @@ Requires:   python%{pyver}-fixtures >= 3.0.0
 Summary:        python-%{service}-tests-tempest documentation
 
 BuildRequires:  python%{pyver}-sphinx
-BuildRequires:  python%{pyver}-oslo-sphinx
+BuildRequires:  python%{pyver}-openstackdocstheme
 
 %description -n python-%{service}-tests-tempest-doc
 It contains the documentation for the ironic tempest plugin.
