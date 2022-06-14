@@ -1,5 +1,5 @@
 %{!?sources_gpg: %{!?dlrn:%global sources_gpg 1} }
-%global sources_gpg_sign 0x4c29ff0e437f3351fd82bdf47c5a3bc787dc7035
+%global sources_gpg_sign 0x01527a34f0d0080f8a5db8d6eb6c5df21b4b6363
 %global service ironic
 %global plugin ironic-tempest-plugin
 %global module ironic_tempest_plugin
@@ -13,7 +13,7 @@ project. Additionally it provides a plugin to automatically load these \
 tests into Tempest.
 
 Name:       python-%{service}-tests-tempest
-Version:    2.3.1
+Version:    2.4.0
 Release:    1%{?dist}
 Summary:    Tempest Integration of Ironic and Ironic-Inspector Project
 License:    ASL 2.0
@@ -111,6 +111,9 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+* Tue Jun 14 2022 RDO <dev@lists.rdoproject.org> 2.4.0-1
+- Update to 2.4.0
+
 * Wed Sep 29 2021 RDO <dev@lists.rdoproject.org> 2.3.1-1
 - Update to 2.3.1
 
