@@ -1,5 +1,5 @@
 %{!?sources_gpg: %{!?dlrn:%global sources_gpg 1} }
-%global sources_gpg_sign 0x2426b928085a020d8a90d0d879ab7008d0896c8a
+%global sources_gpg_sign 0xa63ea142678138d1bb15f2e303bdfd64dd164087
 %global service ironic
 %global plugin ironic-tempest-plugin
 %global module ironic_tempest_plugin
@@ -13,8 +13,8 @@ project. Additionally it provides a plugin to automatically load these \
 tests into Tempest.
 
 Name:       python-%{service}-tests-tempest
-Version:    2.1.0
-Release:    2%{?dist}
+Version:    2.3.0
+Release:    1%{?dist}
 Summary:    Tempest Integration of Ironic and Ironic-Inspector Project
 License:    ASL 2.0
 URL:        https://git.openstack.org/cgit/openstack/%{plugin}/
@@ -111,6 +111,9 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+* Fri Jul 08 2022 RDO <dev@lists.rdoproject.org> 2.3.0-1
+- Update to 2.3.0
+
 * Wed Oct 21 2020 Joel Capitao <jcapitao@redhat.com> 2.1.0-2
 - Enable sources tarball validation using GPG signature.
 
