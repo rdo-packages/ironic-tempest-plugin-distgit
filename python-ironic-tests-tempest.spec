@@ -22,7 +22,7 @@ project. Additionally it provides a plugin to automatically load these \
 tests into Tempest.
 
 Name:       python-%{service}-tests-tempest
-Version:    1.5.1
+Version:    2.3.0
 Release:    1%{?dist}
 Summary:    Tempest Integration of Ironic and Ironic-Inspector Project
 License:    ASL 2.0
@@ -106,6 +106,9 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+* Fri Jul 08 2022 RDO <dev@lists.rdoproject.org> 2.3.0-1
+- Update to 2.3.0
+
 * Mon Sep 30 2019 RDO <dev@lists.rdoproject.org> 1.5.1-1
 - Update to 1.5.1
 
