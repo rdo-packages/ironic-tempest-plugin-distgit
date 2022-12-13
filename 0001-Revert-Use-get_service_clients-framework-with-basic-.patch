@@ -1,0 +1,452 @@
+From ce7764affb7d2b595f12db1e7817acb8749b25de Mon Sep 17 00:00:00 2001
+From: Alfredo Moralejo <amoralej@redhat.com>
+Date: Tue, 13 Dec 2022 17:22:43 +0100
+Subject: [PATCH] Revert "Use get_service_clients framework with basic Secure
+ RBAC"
+
+This reverts commit 3a07c4d5ae3cb277e860d710bee0adb1c2555ee6.
+---
+ ironic_tempest_plugin/config.py               | 16 ---------
+ ironic_tempest_plugin/manager.py              | 34 +++++++++---------
+ ironic_tempest_plugin/plugin.py               | 35 -------------------
+ ironic_tempest_plugin/tests/api/admin/base.py |  9 ++---
+ .../tests/scenario/baremetal_manager.py       | 20 +++++------
+ .../scenario/baremetal_standalone_manager.py  |  2 +-
+ .../tests/scenario/introspection_manager.py   | 10 +++---
+ .../scenario/test_baremetal_basic_ops.py      |  2 +-
+ .../test_baremetal_boot_from_volume.py        |  2 +-
+ .../scenario/test_baremetal_multitenancy.py   |  2 +-
+ .../scenario/test_baremetal_single_tenant.py  |  2 +-
+ 11 files changed, 37 insertions(+), 97 deletions(-)
+
+diff --git a/ironic_tempest_plugin/config.py b/ironic_tempest_plugin/config.py
+index de517dc..7354ef7 100644
+--- a/ironic_tempest_plugin/config.py
++++ b/ironic_tempest_plugin/config.py
+@@ -18,8 +18,6 @@ from oslo_config import cfg
+ from tempest import config  # noqa
+ 
+ 
+-# NOTE(TheJulia): The following options are loaded into a tempest
+-# plugin configuration option via plugin.py.
+ ironic_service_option = cfg.BoolOpt('ironic',
+                                     default=False,
+                                     help='Whether or not ironic is expected '
+@@ -30,18 +28,6 @@ inspector_service_option = cfg.BoolOpt("ironic_inspector",
+                                        help="Whether or not ironic-inspector "
+                                        "is expected to be available")
+ 
+-ironic_scope_enforcement = cfg.BoolOpt('ironic',
+-                                       default=False,
+-                                       help='Wheter or not ironic is '
+-                                            'exepcted to enforce auth '
+-                                            'scope.')
+-
+-inspector_scope_enforcement = cfg.BoolOpt('ironic_inspector',
+-                                          default=False,
+-                                          help='Whether or not '
+-                                               'ironic-inspector is expected '
+-                                               'to enforce auth scope.')
+-
+ baremetal_group = cfg.OptGroup(name='baremetal',
+                                title='Baremetal provisioning service options',
+                                help='When enabling baremetal tests, Nova '
+@@ -52,8 +38,6 @@ baremetal_group = cfg.OptGroup(name='baremetal',
+                                     'live_migration, pause, rescue, resize, '
+                                     'shelve, snapshot, and suspend')
+ 
+-# The bulk of the embedded configuration is below.
+-
+ baremetal_introspection_group = cfg.OptGroup(
+     name="baremetal_introspection",
+     title="Baremetal introspection service options",
+diff --git a/ironic_tempest_plugin/manager.py b/ironic_tempest_plugin/manager.py
+index 95fe207..2977740 100644
+--- a/ironic_tempest_plugin/manager.py
++++ b/ironic_tempest_plugin/manager.py
+@@ -42,7 +42,7 @@ LOG = log.getLogger(__name__)
+ class ScenarioTest(tempest.test.BaseTestCase):
+     """Base class for scenario tests. Uses tempest own clients. """
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary']
+ 
+     @classmethod
+     def setup_clients(cls):
+@@ -92,7 +92,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
+     def _create_port(self, network_id, client=None, namestart='port-quotatest',
+                      **kwargs):
+         if not client:
+-            client = self.os_primary.ports_client
++            client = self.ports_client
+         name = data_utils.rand_name(namestart)
+         result = client.create_port(
+             name=name,
+@@ -106,7 +106,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
+ 
+     def create_keypair(self, client=None):
+         if not client:
+-            client = self.os_primary.keypairs_client
++            client = self.keypairs_client
+         name = data_utils.rand_name(self.__class__.__name__)
+         # We don't need to create a keypair by pubkey in scenario
+         body = client.create_keypair(name=name)
+@@ -254,13 +254,12 @@ class ScenarioTest(tempest.test.BaseTestCase):
+         if not CONF.compute_feature_enabled.console_output:
+             LOG.debug('Console output not supported, cannot log')
+             return
+-        client = self.os_primary.servers_client
+         if not servers:
+-            servers = client.list_servers()
++            servers = self.servers_client.list_servers()
+             servers = servers['servers']
+         for server in servers:
+             try:
+-                console_output = client.get_console_output(
++                console_output = self.servers_client.get_console_output(
+                     server['id'])['output']
+                 LOG.debug('Console output for %s\nbody=\n%s',
+                           server['id'], console_output)
+@@ -278,12 +277,12 @@ class ScenarioTest(tempest.test.BaseTestCase):
+ 
+         LOG.debug("Rebuilding server (id: %s, image: %s, preserve eph: %s)",
+                   server_id, image, preserve_ephemeral)
+-        self.os_primary.servers_client.rebuild_server(
++        self.servers_client.rebuild_server(
+             server_id=server_id, image_ref=image,
+             preserve_ephemeral=preserve_ephemeral,
+             **rebuild_kwargs)
+         if wait:
+-            waiters.wait_for_server_status(self.os_primary.servers_client,
++            waiters.wait_for_server_status(self.servers_client,
+                                            server_id, 'ACTIVE')
+ 
+     def ping_ip_address(self, ip_address, should_succeed=True,
+@@ -358,13 +357,12 @@ class ScenarioTest(tempest.test.BaseTestCase):
+ 
+         if not pool_name:
+             pool_name = CONF.network.floating_network_name
+-        client = self.os_primary.compute_floating_ips_client
+-        floating_ip = (client.
++        floating_ip = (self.compute_floating_ips_client.
+                        create_floating_ip(pool=pool_name)['floating_ip'])
+         self.addCleanup(test_utils.call_and_ignore_notfound_exc,
+-                        client.delete_floating_ip,
++                        self.compute_floating_ips_client.delete_floating_ip,
+                         floating_ip['id'])
+-        client.associate_floating_ip_to_server(
++        self.compute_floating_ips_client.associate_floating_ip_to_server(
+             floating_ip['ip'], thing['id'])
+         return floating_ip
+ 
+@@ -425,7 +423,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
+         routes traffic to the public network.
+         """
+         if not client:
+-            client = self.os_primary.routers_client
++            client = self.routers_client
+         if not tenant_id:
+             tenant_id = client.tenant_id
+         router_id = CONF.network.public_router_id
+@@ -445,7 +443,7 @@ class ScenarioTest(tempest.test.BaseTestCase):
+     def _create_router(self, client=None, tenant_id=None,
+                        namestart='router-smoke'):
+         if not client:
+-            client = self.os_primary.routers_client
++            client = self.routers_client
+         if not tenant_id:
+             tenant_id = client.tenant_id
+         name = data_utils.rand_name(namestart)
+@@ -472,7 +470,7 @@ class NetworkScenarioTest(ScenarioTest):
+ 
+     """
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary', 'admin']
+ 
+     @classmethod
+     def skip_checks(cls):
+@@ -485,9 +483,9 @@ class NetworkScenarioTest(ScenarioTest):
+                         namestart='network-smoke-',
+                         port_security_enabled=True):
+         if not networks_client:
+-            networks_client = self.os_primary.networks_client
++            networks_client = self.networks_client
+         if not tenant_id:
+-            tenant_id = self.os_primary.networks_client.tenant_id
++            tenant_id = networks_client.tenant_id
+         name = data_utils.rand_name(namestart)
+         network_kwargs = dict(name=name, tenant_id=tenant_id)
+         # Neutron disables port security by default so we have to check the
+@@ -544,7 +542,7 @@ class NetworkScenarioTest(ScenarioTest):
+         if not external_network_id:
+             external_network_id = CONF.network.public_network_id
+         if not client:
+-            client = self.os_primary.floating_ips_client
++            client = self.floating_ips_client
+         if not port_id:
+             port_id, ip4 = self._get_server_port_id_and_ip4(thing)
+         else:
+diff --git a/ironic_tempest_plugin/plugin.py b/ironic_tempest_plugin/plugin.py
+index 546509b..43b2052 100644
+--- a/ironic_tempest_plugin/plugin.py
++++ b/ironic_tempest_plugin/plugin.py
+@@ -43,43 +43,8 @@ class IronicTempestPlugin(plugins.TempestPlugin):
+                           group='service_available')
+         conf.register_opt(project_config.inspector_service_option,
+                           group='service_available')
+-        conf.register_opt(project_config.ironic_scope_enforcement,
+-                          group='enforce_scope')
+-        conf.register_opt(project_config.inspector_scope_enforcement,
+-                          group='enforce_scope')
+         for group, option in _opts:
+             config.register_opt_group(conf, group, option)
+ 
+     def get_opt_lists(self):
+         return [(group.name, option) for group, option in _opts]
+-
+-    def get_service_clients(self):
+-        ironic_config = config.service_client_config(
+-            project_config.baremetal_group.name
+-        )
+-        baremetal_client = {
+-            'name': 'baremetal',
+-            'service_version': 'baremetal.v1',
+-            'module_path': 'ironic_tempest_plugin.services.baremetal.v1.'
+-                           'json.baremetal_client',
+-            'client_names': [
+-                'BaremetalClient',
+-            ],
+-        }
+-        baremetal_client.update(ironic_config)
+-
+-        inspector_config = config.service_client_config(
+-            project_config.baremetal_introspection_group.name
+-        )
+-        inspector_client = {
+-            'name': 'introspection',
+-            'service_version': 'baremetal_introspection.v1',
+-            'module_path': 'ironic_tempest_plugin.services.'
+-                           'introspection_client',
+-            'client_names': [
+-                'BaremetalIntrospectionClient',
+-            ],
+-        }
+-        inspector_client.update(inspector_config)
+-
+-        return [baremetal_client, inspector_client]
+diff --git a/ironic_tempest_plugin/tests/api/admin/base.py b/ironic_tempest_plugin/tests/api/admin/base.py
+index d78f74a..8cc8aec 100644
+--- a/ironic_tempest_plugin/tests/api/admin/base.py
++++ b/ironic_tempest_plugin/tests/api/admin/base.py
+@@ -17,6 +17,7 @@ from tempest.lib.common.utils import data_utils
+ from tempest.lib import exceptions as lib_exc
+ from tempest import test
+ 
++from ironic_tempest_plugin import clients
+ from ironic_tempest_plugin.common import waiters
+ from ironic_tempest_plugin.services.baremetal import base
+ from ironic_tempest_plugin.tests.api.admin import api_microversion_fixture
+@@ -57,7 +58,7 @@ class BaseBaremetalTest(api_version_utils.BaseMicroversionTest,
+                         test.BaseTestCase):
+     """Base class for Baremetal API tests."""
+ 
+-    credentials = ['admin', 'system_admin']
++    credentials = ['admin']
+ 
+     @classmethod
+     def skip_checks(cls):
+@@ -85,16 +86,12 @@ class BaseBaremetalTest(api_version_utils.BaseMicroversionTest,
+                 CONF.baremetal.min_microversion))
+         cls.services_microversion = {
+             CONF.baremetal.catalog_type: cls.request_microversion}
+-
+         super(BaseBaremetalTest, cls).setup_credentials()
+ 
+     @classmethod
+     def setup_clients(cls):
+         super(BaseBaremetalTest, cls).setup_clients()
+-        if CONF.enforce_scope.ironic:
+-            cls.client = cls.os_system_admin.baremetal.BaremetalClient()
+-        else:
+-            cls.client = cls.os_admin.baremetal.BaremetalClient()
++        cls.client = clients.Manager().baremetal_client
+ 
+     @classmethod
+     def resource_setup(cls):
+diff --git a/ironic_tempest_plugin/tests/scenario/baremetal_manager.py b/ironic_tempest_plugin/tests/scenario/baremetal_manager.py
+index 4820c64..db0d200 100644
+--- a/ironic_tempest_plugin/tests/scenario/baremetal_manager.py
++++ b/ironic_tempest_plugin/tests/scenario/baremetal_manager.py
+@@ -22,6 +22,7 @@ from tempest.lib.common import api_version_utils
+ from tempest.lib.common.utils.linux import remote_client
+ from tempest.lib import exceptions as lib_exc
+ 
++from ironic_tempest_plugin import clients
+ from ironic_tempest_plugin.common import utils
+ from ironic_tempest_plugin.common import waiters as ironic_waiters
+ from ironic_tempest_plugin import manager
+@@ -73,7 +74,7 @@ class BaremetalProvisionStates(object):
+ 
+ class BaremetalScenarioTest(manager.ScenarioTest):
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary', 'admin']
+     min_microversion = None
+     max_microversion = api_version_utils.LATEST_MICROVERSION
+ 
+@@ -92,11 +93,8 @@ class BaremetalScenarioTest(manager.ScenarioTest):
+     @classmethod
+     def setup_clients(cls):
+         super(BaremetalScenarioTest, cls).setup_clients()
+-        if CONF.enforce_scope.ironic:
+-            client = cls.os_system_admin.baremetal.BaremetalClient()
+-        else:
+-            client = cls.os_admin.baremetal.BaremetalClient()
+-        cls.baremetal_client = client
++
++        cls.baremetal_client = clients.Manager().baremetal_client
+ 
+     @classmethod
+     def resource_setup(cls):
+@@ -174,7 +172,7 @@ class BaremetalScenarioTest(manager.ScenarioTest):
+     def boot_instance(self, clients=None, keypair=None,
+                       net_id=None, fixed_ip=None, **create_kwargs):
+         if clients is None:
+-            servers_client = self.os_primary.servers_client
++            servers_client = self.servers_client
+         else:
+             servers_client = clients.servers_client
+         if keypair is None:
+@@ -224,7 +222,7 @@ class BaremetalScenarioTest(manager.ScenarioTest):
+ 
+     def terminate_instance(self, instance, servers_client=None):
+         if servers_client is None:
+-            servers_client = self.os_primary.servers_client
++            servers_client = self.servers_client
+ 
+         node = self.get_node(instance_id=instance['id'])
+         servers_client.delete_server(instance['id'])
+@@ -241,7 +239,7 @@ class BaremetalScenarioTest(manager.ScenarioTest):
+                         servers_client=None):
+         """Rescue the instance, verify we can ping and SSH."""
+         if servers_client is None:
+-            servers_client = self.os_primary.servers_client
++            servers_client = self.servers_client
+ 
+         rescuing_instance = servers_client.rescue_server(instance['id'])
+         rescue_password = rescuing_instance['adminPass']
+@@ -267,8 +265,8 @@ class BaremetalScenarioTest(manager.ScenarioTest):
+     def unrescue_instance(self, instance, node, server_ip,
+                           servers_client=None):
+         if servers_client is None:
+-            servers_client = self.os_primary.servers_client
+-        self.os_primary.servers_client.unrescue_server(instance['id'])
++            servers_client = self.servers_client
++        self.servers_client.unrescue_server(instance['id'])
+         self.wait_provisioning_state(
+             node['uuid'],
+             BaremetalProvisionStates.ACTIVE,
+diff --git a/ironic_tempest_plugin/tests/scenario/baremetal_standalone_manager.py b/ironic_tempest_plugin/tests/scenario/baremetal_standalone_manager.py
+index 176f912..10a83a6 100644
+--- a/ironic_tempest_plugin/tests/scenario/baremetal_standalone_manager.py
++++ b/ironic_tempest_plugin/tests/scenario/baremetal_standalone_manager.py
+@@ -31,7 +31,7 @@ CONF = config.CONF
+ class BaremetalStandaloneManager(bm.BaremetalScenarioTest,
+                                  manager.NetworkScenarioTest):
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary', 'admin']
+     # NOTE(vsaienko): Standalone tests are using v1/node/<node_ident>/vifs to
+     # attach VIF to a node.
+     min_microversion = '1.28'
+diff --git a/ironic_tempest_plugin/tests/scenario/introspection_manager.py b/ironic_tempest_plugin/tests/scenario/introspection_manager.py
+index 199bab1..71fa001 100644
+--- a/ironic_tempest_plugin/tests/scenario/introspection_manager.py
++++ b/ironic_tempest_plugin/tests/scenario/introspection_manager.py
+@@ -23,6 +23,7 @@ from tempest.lib import exceptions as lib_exc
+ 
+ import ironic_tempest_plugin
+ from ironic_tempest_plugin import exceptions
++from ironic_tempest_plugin.services import introspection_client
+ from ironic_tempest_plugin.tests.api.admin.api_microversion_fixture import \
+     APIMicroversionFixture as IronicMicroversionFixture
+ from ironic_tempest_plugin.tests.scenario.baremetal_manager import \
+@@ -39,7 +40,7 @@ class InspectorScenarioTest(BaremetalScenarioTest):
+ 
+     wait_provisioning_state_interval = 15
+ 
+-    credentials = ['admin', 'system_admin', 'primary']
++    credentials = ['primary', 'admin']
+ 
+     ironic_api_version = LATEST_MICROVERSION
+ 
+@@ -52,11 +53,8 @@ class InspectorScenarioTest(BaremetalScenarioTest):
+     @classmethod
+     def setup_clients(cls):
+         super(InspectorScenarioTest, cls).setup_clients()
+-        if CONF.enforce_scope.ironic_inspector:
+-            oscli = cls.os_system_admin.introspection
+-        else:
+-            oscli = cls.os_admin.introspection
+-        cls.introspection_client = oscli.BaremetalIntrospectionClient()
++        inspector_manager = introspection_client.Manager()
++        cls.introspection_client = inspector_manager.introspection_client
+ 
+     def setUp(self):
+         super(InspectorScenarioTest, self).setUp()
+diff --git a/ironic_tempest_plugin/tests/scenario/test_baremetal_basic_ops.py b/ironic_tempest_plugin/tests/scenario/test_baremetal_basic_ops.py
+index d4e8ae3..e3c1929 100644
+--- a/ironic_tempest_plugin/tests/scenario/test_baremetal_basic_ops.py
++++ b/ironic_tempest_plugin/tests/scenario/test_baremetal_basic_ops.py
+@@ -45,7 +45,7 @@ class BaremetalBasicOps(baremetal_manager.BaremetalScenarioTest):
+           expected state transitions
+     """
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary', 'admin']
+ 
+     TEST_RESCUE_MODE = False
+     image_ref = None
+diff --git a/ironic_tempest_plugin/tests/scenario/test_baremetal_boot_from_volume.py b/ironic_tempest_plugin/tests/scenario/test_baremetal_boot_from_volume.py
+index 154fc96..9908270 100644
+--- a/ironic_tempest_plugin/tests/scenario/test_baremetal_boot_from_volume.py
++++ b/ironic_tempest_plugin/tests/scenario/test_baremetal_boot_from_volume.py
+@@ -34,7 +34,7 @@ class BaremetalBFV(baremetal_manager.BaremetalScenarioTest):
+     * Delete instance
+     """
+ 
+-    credentials = ['primary', 'admin', 'system_admin']
++    credentials = ['primary', 'admin']
+ 
+     min_microversion = '1.32'
+ 
+diff --git a/ironic_tempest_plugin/tests/scenario/test_baremetal_multitenancy.py b/ironic_tempest_plugin/tests/scenario/test_baremetal_multitenancy.py
+index fc4c513..60c3ed9 100644
+--- a/ironic_tempest_plugin/tests/scenario/test_baremetal_multitenancy.py
++++ b/ironic_tempest_plugin/tests/scenario/test_baremetal_multitenancy.py
+@@ -36,7 +36,7 @@ class BaremetalMultitenancy(baremetal_manager.BaremetalScenarioTest,
+     * Delete both instances
+     """
+ 
+-    credentials = ['primary', 'alt', 'admin', 'system_admin']
++    credentials = ['primary', 'alt', 'admin']
+ 
+     @classmethod
+     def skip_checks(cls):
+diff --git a/ironic_tempest_plugin/tests/scenario/test_baremetal_single_tenant.py b/ironic_tempest_plugin/tests/scenario/test_baremetal_single_tenant.py
+index e06d43a..a873471 100644
+--- a/ironic_tempest_plugin/tests/scenario/test_baremetal_single_tenant.py
++++ b/ironic_tempest_plugin/tests/scenario/test_baremetal_single_tenant.py
+@@ -36,7 +36,7 @@ class BaremetalSingleTenant(baremetal_manager.BaremetalScenarioTest,
+     * Delete both instances
+     """
+ 
+-    credentials = ['primary', 'alt', 'admin', 'system_admin']
++    credentials = ['primary', 'alt', 'admin']
+ 
+     @classmethod
+     def skip_checks(cls):
+-- 
+2.34.1
+

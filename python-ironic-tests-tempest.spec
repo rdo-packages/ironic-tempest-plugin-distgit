@@ -23,12 +23,13 @@ tests into Tempest.
 
 Name:       python-%{service}-tests-tempest
 Version:    2.3.0
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Tempest Integration of Ironic and Ironic-Inspector Project
 License:    ASL 2.0
 URL:        https://git.openstack.org/cgit/openstack/%{plugin}/
 
 Source0:    http://tarballs.openstack.org/%{plugin}/%{plugin}-%{upstream_version}.tar.gz
+Patch01:    0001-Revert-Use-get_service_clients-framework-with-basic-.patch
 
 BuildArch:  noarch
 
@@ -106,6 +107,9 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+* Tue Dec 13 2022 Alfredo Moralejo <amoralej@redhat.com> 2.3.0-2
+- Revert use of get_service_clients framework with basic Secure RBAC
+
 * Fri Jul 08 2022 RDO <dev@lists.rdoproject.org> 2.3.0-1
 - Update to 2.3.0
 
