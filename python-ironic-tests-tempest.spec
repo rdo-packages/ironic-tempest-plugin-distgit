@@ -19,8 +19,8 @@ project. Additionally it provides a plugin to automatically load these \
 tests into Tempest.
 
 Name:       python-%{service}-tests-tempest
-Version:    2.9.0
-Release:    2%{?dist}
+Version:    2.11.0
+Release:    3%{?dist}
 Summary:    Tempest Integration of Ironic and Ironic-Inspector Project
 License:    Apache-2.0
 URL:        https://git.openstack.org/cgit/openstack/%{plugin}/
@@ -118,6 +118,15 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+* Wed Oct 02 2024 RDO <dev@lists.rdoproject.org> 2.11.0-3
+- Rebuild in Bobcat
+
+* Wed Oct 02 2024 RDO <dev@lists.rdoproject.org> 2.11.0-2
+- Rebuild in Antelope
+
+* Wed Sep 25 2024 RDO <dev@lists.rdoproject.org> 2.11.0-1
+- Update to 2.11.0
+
 * Tue Apr 09 2024 RDO <dev@lists.rdoproject.org> 2.9.0-2
 - Rebuild in Bobcat
 
