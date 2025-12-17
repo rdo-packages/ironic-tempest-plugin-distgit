@@ -120,3 +120,4 @@ rm -rf doc/build/html/.{doctrees,buildinfo}
 %endif
 
 %changelog
+# REMOVEME: error caused by commit https://opendev.org/openstack/ironic-tempest-plugin/commit/dba9f9555989526bf3d2f51a688f54a80c6d2ffd
